@@ -1,5 +1,8 @@
 import 'package:desafio_imc/classe/pessoa.dart';
+import 'package:desafio_imc/model/imc_sqlite_model.dart';
 import 'package:desafio_imc/page/historico_imc.dart';
+import 'package:desafio_imc/preferences/user_preferences.dart';
+import 'package:desafio_imc/repositories/sqlite/imc_sqlite_repository.dart';
 import 'package:desafio_imc/utils/calculadora_imc.dart';
 import 'package:flutter/material.dart';
 import 'package:desafio_imc/classe/navigation_bar.dart';
@@ -12,10 +15,17 @@ class Home extends StatefulWidget {
 }
 
 class _HomeState extends State<Home> {
+  AppStorageService storage = AppStorageService();
+
+  //Chamando repository do SQLite:
+  IMCSQLiteRepository imcsqLiteRepository = IMCSQLiteRepository();
+  var _consulta = const <IMCSQLiteModel>[];
+
   var alturaController = TextEditingController();
   var pesoController = TextEditingController();
+  var nomeController = TextEditingController();
 
-  Pessoa pessoa = Pessoa(altura: 0.0, peso: 0.0);
+  Pessoa pessoa = Pessoa(nome: "", altura: 0.0, peso: 0.0);
   double imcCalculado = 0.0;
 
   int posicaoPagina = 0; //Índice de Guia Selecionada
@@ -23,6 +33,18 @@ class _HomeState extends State<Home> {
   @override
   void initState() {
     super.initState();
+    carregarDados();
+  }
+
+  getData() async {
+    _consulta = await imcsqLiteRepository.obterDados();
+    setState(() {});
+  }
+
+  carregarDados() async {
+    nomeController.text = await storage.getNomeUsuario();
+    alturaController.text = (await (storage.getAlturaUsuario())).toString();
+    setState(() {});
   }
 
   @override
@@ -40,6 +62,16 @@ class _HomeState extends State<Home> {
             ),
             const SizedBox(
               height: 25,
+            ),
+            TextField(
+              decoration: const InputDecoration(
+                labelText: "Nome",
+                prefixIcon: Icon(Icons.person),
+              ),
+              controller: nomeController,
+              onChanged: (text) {
+                pessoa.nome = text;
+              },
             ),
             TextField(
               decoration: const InputDecoration(
@@ -64,11 +96,15 @@ class _HomeState extends State<Home> {
             const SizedBox(height: 20),
             ElevatedButton(
               onPressed: () {
-                imcCalculado = calcularIMC(pessoa);
+                calcularIMC(pessoa);
                 for (var imc in pessoa.historicoIMC) {
                   debugPrint("Histórico de IMC: $imc");
                 }
                 pesoController.clear();
+                // Atualize os valores no SharedPreferences
+                storage.setNomeUsuario(nomeController.text);
+                storage.setAlturaUsuario(
+                    double.tryParse(alturaController.text) ?? 0.0);
               },
               style: ElevatedButton.styleFrom(
                   shape: RoundedRectangleBorder(
@@ -76,7 +112,7 @@ class _HomeState extends State<Home> {
               child: const Text("Calcular IMC"),
             ),
             const SizedBox(
-              height: 90,
+              height: 30,
             ),
             CustomBottomNavigationBar(
                 currentIndex: posicaoPagina, // Defina o índice atual da guia
